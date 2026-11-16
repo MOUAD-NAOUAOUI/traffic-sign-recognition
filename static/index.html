@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Traffic Sign Recognition — Autonomous Driving Perception</title>
+  
+  <!-- Inter Google Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- Application Header -->
+  <header class="header">
+    <div class="header-container">
+      <a href="/" class="brand">
+        <div class="brand-icon">
+          <!-- Lucide Compass / Navigation outline icon -->
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+          </svg>
+        </div>
+        <span class="brand-title">Traffic Sign Recognition</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Application Body -->
+  <main class="main-container">
+    
+    <!-- Hero / Headline -->
+    <div class="hero-section">
+      <h1 class="hero-title">Sign Classification & Perception</h1>
+      <p class="hero-subtitle">
+        Upload a road camera capture or select a test sample to perform real-time traffic sign classification using our custom deep convolutional neural network.
+      </p>
+    </div>
+
+    <!-- Upload & Input Card -->
+    <div class="card" id="input-card">
+      
+      <!-- Drag and Drop Zone -->
+      <div class="upload-zone" id="drop-zone">
+        <input type="file" id="file-input" accept="image/png,image/jpeg,image/jpg,image/webp,image/bmp,.ppm" style="display: none;">
+        
+        <div class="upload-icon-wrapper">
+          <!-- Lucide UploadCloud outline icon -->
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
+            <path d="M12 12v9"></path>
+            <path d="m16 16-4-4-4 4"></path>
+          </svg>
+        </div>
+        
+        <div class="upload-text-main">Drop your traffic sign image here</div>
+        <div class="upload-text-sub">Supports PNG, JPG, JPEG, PPM or WEBP (up to 10MB)</div>
+        
+        <button type="button" class="btn btn-secondary" id="browse-btn">
+          Browse File
+        </button>
+      </div>
+
+      <!-- Quick Test Samples Row -->
+      <div class="samples-wrapper">
+        <div class="samples-label">Or evaluate with a test sign:</div>
+        <div class="samples-grid" id="samples-container">
+          <!-- Populated dynamically via /api/samples -->
+        </div>
+      </div>
+
+      <!-- File Preview Box (Hidden until image selected) -->
+      <div class="preview-container" id="preview-box">
+        <div class="preview-content">
+          <img id="preview-img" class="preview-thumbnail" alt="Selected sign preview">
+          <div class="preview-meta">
+            <div class="preview-filename" id="preview-name">image.png</div>
+            <div class="preview-size" id="preview-dims">Ready for analysis</div>
+            <div class="preview-actions">
+              <button class="btn btn-primary" id="analyze-btn">
+                <!-- Lucide Zap / Sparkles outline -->
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+                <span>Analyze Sign</span>
+              </button>
+              <button class="btn btn-secondary" id="clear-btn">Change</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Live Prediction Results Section (Hidden until prediction returns) -->
+    <section class="results-section" id="results-panel">
+      <div class="result-card">
+        
+        <div class="result-grid">
+          
+          <!-- Image Box -->
+          <div class="result-image-box">
+            <img id="result-img" alt="Analyzed sign">
+            <div class="result-caption" id="result-resolution">48 × 48 Input Tensor</div>
+          </div>
+
+          <!-- Analysis Details -->
+          <div class="result-info">
+            
+            <div class="status-badge success" id="status-pill">
+              <!-- Lucide CheckCircle -->
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+              <span id="status-text">Classification Verified</span>
+            </div>
+
+            <div>
+              <div class="sign-title" id="predicted-name">Loading...</div>
+              <div style="font-size: 13px; color: var(--text-muted); margin-top: 2px;" id="predicted-class-id">Class ID: --</div>
+            </div>
+
+            <!-- Confidence Metric -->
+            <div>
+              <div class="confidence-display">
+                <span class="confidence-number" id="confidence-pct">--%</span>
+                <span class="confidence-label">Confidence Score</span>
+              </div>
+              <div class="progress-bar-container" style="margin-top: 8px;">
+                <div class="progress-bar-fill" id="confidence-bar" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <!-- Top Candidates Ranking -->
+            <div>
+              <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 6px;">
+                Top Probability Distribution
+              </div>
+              <div class="ranking-table" id="ranking-list">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+
+            <div class="result-footer-actions">
+              <button class="btn btn-secondary" id="reset-btn">
+                <!-- Lucide Refresh -->
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                  <path d="M21 3v5h-5"></path>
+                  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                  <path d="M8 16H3v5"></path>
+                </svg>
+                <span>Analyze Another Sign</span>
+              </button>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <script src="/static/js/main.js"></script>
+</body>
+</html>

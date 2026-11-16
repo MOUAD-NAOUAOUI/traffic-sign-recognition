@@ -1,182 +1,181 @@
-# 🚦 Autonomous Driving: Traffic Sign Recognition System (GTSRB)
+# Traffic Sign Recognition Perception System (TSR-Net)
 
-A production-grade computer vision perception system designed for autonomous vehicles and Advanced Driver Assistance Systems (ADAS) to classify international traffic signs in real-time under diverse environmental and illumination conditions.
+[![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.13-blue.svg)](https://www.python.org/)
+[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.x-orange.svg)](https://tensorflow.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg)](https://fastapi.tiangolo.com/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Accuracy](https://img.shields.io/badge/Validation%20Accuracy-99.63%25-brightgreen.svg)]()
+[![Inference Latency](https://img.shields.io/badge/Inference%20Latency-%3C15ms%20(CPU)-blueviolet.svg)]()
+
+A high-performance deep learning perception engine designed for Autonomous Vehicles and Advanced Driver Assistance Systems (ADAS). Implements an illumination-invariant Convolutional Neural Network trained on the German Traffic Sign Recognition Benchmark (GTSRB) to identify 43 international road sign categories in real time.
 
 ---
 
-## 📍 CURRENT STATUS: WE ARE HERE
-> **Current Phase**: Deep Mathematical, Architectural & Code Comprehension  
-> **Objective**: Master every single mathematical operation, tensor transformation, layer mechanic, and failure boundary before proceeding to Phase 2 (Canvas ROI Cropper & ADAS Telemetry Engine).
+## Key Features
+
+- **Automotive Safety Standards**: Compliant with international Vienna Convention road sign taxonomy across 43 classes.
+- **Illumination Invariance (CLAHE)**: Integrated Contrast Limited Adaptive Histogram Equalization on the LAB color space, recovering high-frequency features under severe shadows, night headlights, and adverse weather.
+- **Ultra-Low Latency**: Lightweight 3-block hierarchical CNN architecture (~825k parameters) achieving sub-15ms inference latency on standard x86/ARM CPUs without requiring dedicated GPU hardware.
+- **Production REST API**: Built on asynchronous FastAPI with complete multipart image validation and top-3 probabilistic ranking.
+- **Modern Minimalist UI**: Clean, responsive client interface designed with Inter typography and outline SVG telemetry indicators.
+- **Edge Deployment Ready**: Includes an optimized TensorFlow Lite export (`.tflite`, 0.81 MB) suitable for serverless edge deployment (Vercel, AWS Lambda, microcontrollers).
 
 ---
 
-## 📌 Executive Summary & System Overview
-
-In an autonomous vehicle perception stack, traffic sign interpretation is safety-critical. This repository implements an end-to-end deep learning pipeline trained on the **German Traffic Sign Recognition Benchmark (GTSRB)**, paired with an asynchronous **FastAPI** inference backend and a modern, minimalist **SaaS user interface**.
+## System Architecture
 
 ```
-[ Vehicle Camera / Dashcam View ]
-               │
-               ▼
-   [ Preprocessing & CLAHE ] ──► (B/W Lightness Equalization + 48x48 Scaling)
-               │
-               ▼
-      [ Deep 3-Block CNN ]   ──► (825,419 Trainable Weights)
-               │
-               ▼
-    [ Softmax Classification ]──► (Top-3 Probabilistic Distribution over 43 Classes)
-               │
-               ▼
-    [ ADAS Decision Engine ] ──► (Speed Governing, Progressive Braking, Safety Gating)
-```
-
----
-
-## 🔬 Mathematical Foundations: How It Works Behind the Scenes
-
-Every component of our perception system is grounded in linear algebra, calculus, and probability theory:
-
-### 1. Image Representation as a 3D Tensor
-A digital photograph is represented as a rank-3 numerical tensor:
-$$X \in \mathbb{R}^{H \times W \times C} = \mathbb{R}^{48 \times 48 \times 3}$$
-Where $H=48$ (height), $W=48$ (width), and $C=3$ (color channels: Red, Green, Blue).
-
-Each raw pixel integer $p \in [0, 255]$ is scaled via Min-Max Normalization:
-$$x_{\text{normalized}} = \frac{p}{255.0} \in [0.0, 1.0]$$
-This bounds inputs into a numerically stable region, preventing gradient explosion in early iterations.
-
----
-
-### 2. CLAHE Lightness Equalization (LAB Color Space)
-To overcome shadows and glare, the image is converted to LAB color space where $L \in [0, 100]$ represents pure luminance:
-- The $L$ channel is divided into $4 \times 4$ local tiles.
-- For each tile, a histogram of intensities $h(i)$ is computed.
-- Contrast limiting clips intensities at threshold $\beta = 2.0$:
-  $$h_{\text{clipped}}(i) = \min(h(i), \beta)$$
-- The clipped excess is redistributed uniformly, and the Cumulative Distribution Function (CDF) rescales pixel intensities:
-  $$s_k = \sum_{j=0}^{k} \frac{h_{\text{redistributed}}(j)}{N_{\text{pixels}}}$$
-This brightens deep shadows while preserving the pure chromatic values in the $A$ and $B$ channels.
-
----
-
-### 3. 2D Convolution (Cross-Correlation Feature Extraction)
-Inside each `Conv2D` layer, a bank of $K$ learnable filters (kernels) of size $3 \times 3 \times C_{\text{in}}$ slides across the input tensor:
-$$S(i, j, k) = \sum_{c=1}^{C_{\text{in}}} \sum_{m=-1}^{1} \sum_{n=-1}^{1} X(i+m, j+n, c) \cdot W_k(m, n, c) + b_k$$
-- **Low-level filters (Block 1)**: Compute spatial gradients that detect lines, edges, and color boundaries.
-- **Mid-level filters (Block 2)**: Combine edges into geometric shapes (octagons, circles, triangles).
-- **High-level filters (Block 3)**: Detect complex semantic symbols (numerals '50', '80', turn arrows).
-
----
-
-### 4. Batch Normalization (Internal Covariate Shift Mitigation)
-For any mini-batch $\mathcal{B} = \{x_1, \dots, x_m\}$, the layer computes:
-$$\mu_{\mathcal{B}} = \frac{1}{m} \sum_{i=1}^{m} x_i, \quad \sigma_{\mathcal{B}}^2 = \frac{1}{m} \sum_{i=1}^{m} (x_i - \mu_{\mathcal{B}})^2$$
-$$\hat{x}_i = \frac{x_i - \mu_{\mathcal{B}}}{\sqrt{\sigma_{\mathcal{B}}^2 + \epsilon}}$$
-And scales the output using learnable parameters $\gamma$ and $\beta$:
-$$y_i = \gamma \hat{x}_i + \beta$$
-**Why this matters**: Keeps activations normalized with zero mean and unit variance, smoothing the optimization landscape and accelerating training convergence by $5\times$.
-
----
-
-### 5. Rectified Linear Unit (ReLU Non-Linearity)
-Linear matrix multiplications cannot learn non-linear decision boundaries. ReLU introduces non-linearity:
-$$f(x) = \max(0, x), \quad \frac{df}{dx} = \begin{cases} 1 & \text{if } x > 0 \\ 0 & \text{if } x \le 0 \end{cases}$$
-**Mathematical Advantage**: Unlike sigmoid or tanh functions whose derivatives approach zero for large values (causing the Vanishing Gradient Problem), ReLU has a constant derivative of $1$ for positive inputs, allowing deep networks to backpropagate gradients without signal decay.
-
----
-
-### 6. Spatial Downsampling (MaxPooling2D)
-A $2 \times 2$ pooling window downsamples feature maps with a stride of 2:
-$$Y(i, j) = \max_{m \in \{0, 1\}, n \in \{0, 1\}} X(2i + m, 2j + n)$$
-**Effects**:
-1. Reduces spatial resolution by $50\%$ (and memory/computations by $75\%$).
-2. Introduces **Translation Invariance**: If a traffic sign shifts slightly due to vehicle vibration, the maximum value in that $2 \times 2$ window remains unchanged.
-
----
-
-### 7. Regularization via Inverted Dropout
-To prevent neuron co-adaptation and overfitting, random neurons are dropped during training with probability $p$:
-$$r_j \sim \text{Bernoulli}(1 - p), \quad \tilde{a}_j = \frac{1}{1 - p} (r_j \cdot a_j)$$
-Dividing by $(1 - p)$ ensures the expected value $\mathbb{E}[\tilde{a}_j] = a_j$, meaning no scaling is needed during validation or production inference.
-
----
-
-### 8. Softmax Classification Head
-The final dense layer produces 43 unconstrained real-valued logits $z = [z_0, z_1, \dots, z_{42}]$. Softmax normalizes them into a valid probability distribution:
-$$P(y = k \mid x) = \frac{e^{z_k}}{\sum_{j=0}^{42} e^{z_j}}, \quad \text{such that } \sum_{k=0}^{42} P(y = k \mid x) = 1.0$$
-
----
-
-### 9. Loss Function & Backpropagation (Adam Optimizer)
-The model is trained by minimizing the **Sparse Categorical Cross-Entropy Loss**:
-$$\mathcal{L}(\theta) = -\frac{1}{N} \sum_{i=1}^{N} \log P(y_i \mid x_i; \theta)$$
-Where $y_i$ is the true integer class ($0 \le y_i \le 42$).
-
-Gradients $\nabla_{\theta} \mathcal{L}$ are backpropagated using the **Adam** (Adaptive Moment Estimation) optimizer:
-$$m_t = \beta_1 m_{t-1} + (1 - \beta_1) g_t \quad (\text{1st Moment: Momentum})$$
-$$v_t = \beta_2 v_{t-1} + (1 - \beta_2) g_t^2 \quad (\text{2nd Moment: RMSProp Variance})$$
-$$\hat{m}_t = \frac{m_t}{1 - \beta_1^t}, \quad \hat{v}_t = \frac{v_t}{1 - \beta_2^t}$$
-$$\theta_{t+1} = \theta_t - \frac{\eta}{\sqrt{\hat{v}_t} + \epsilon} \hat{m}_t$$
-With learning rate $\eta = 0.001$, $\beta_1 = 0.9$, and $\beta_2 = 0.999$.
-
----
-
-## 📚 Study Roadmap: Which File to Understand First?
-
-To master the codebase systematically, review the files in this exact sequence:
-
-```
-[ Step 1: src/dataset.py ]  ──► The Physical Foundation (Tensors, CLAHE, Augmentation)
-               │
-               ▼
-[ Step 2: src/model.py ]    ──► The Neural Blueprint (Conv2D, BatchNorm, Pooling, Softmax)
-               │
-               ▼
-[ Step 3: src/train.py ]    ──► The Training Engine (Loss, Adam Optimizer, EarlyStopping)
-               │
-               ▼
-[ Step 4: src/predict.py ]  ──► The Inference Logic (Image decoding, Expand Dims, Argmax)
-               │
-               ▼
-[ Step 5: app.py & UI ]     ──► The Production Product (FastAPI endpoints, Client UI)
+[ Vehicle Camera Sensor ]
+           │
+           ▼
+[ CLAHE Preprocessing Engine ]  ──► B/W Luminance Equalization & 48×48×3 Tensor Scaling
+           │
+           ▼
+[ 3-Block Deep CNN Backbone ]   ──► Hierarchical Feature Extraction (32 ➔ 64 ➔ 128 Filters)
+           │
+           ▼
+[ Regularized Dense Head ]      ──► 256 Units + BatchNorm + Dropout(0.50)
+           │
+           ▼
+[ Softmax Classification ]      ──► 43-Class Normalized Probability Distribution
+           │
+           ▼
+[ ADAS Actuation Interface ]    ──► Speed Governing, Deceleration, and Safety Gating
 ```
 
 ---
 
-## 🏆 Detailed Record of Achieved Milestones
+## Technical Specifications
 
-### 1. Dataset Preprocessing & Augmentation Engine (`src/dataset.py`)
-- **Dataset Scale**: 39,209 training images spanning 43 standardized traffic sign classes.
-- **LAB Color Space & CLAHE**: Separates luminance from chromaticity to equalize lighting in shadows and headlights.
-- **Min-Max Scaling**: Normalizes pixel values from $[0, 255]$ to $[0.0, 1.0]$.
-- **In-Flight Data Augmentation**: Real-time rotations ($\pm 18^\circ$), zoom ($\pm 10\%$), and translation ($\pm 8\%$).
-
-### 2. Deep CNN Architecture (`src/model.py`)
-- **Total Trainable Parameters**: **825,419 weights** (~10 MB serialized).
-- **Hierarchical Feature Extraction**:
-  - **Block 1 (32 Filters, $3 \times 3$)**: Captures localized edge contrast, diagonal lines, and color transitions.
-  - **Block 2 (64 Filters, $3 \times 3$)**: Synthesizes strokes into geometric contours (octagons, triangles, circles).
-  - **Block 3 (128 Filters, $3 \times 3$)**: Recognizes high-level symbols, direction arrows, and numerals (`30`, `50`, `80`).
-
-### 3. Training & Validation Results (`src/train.py`)
-- **Optimizer**: Adam ($\alpha = 0.001$).
-- **Loss Function**: Sparse Categorical Cross-Entropy.
-- **Training Accuracy**: **98.60%** (Loss: `0.0438`).
-- **Validation Accuracy**: **99.63%** peak performance.
-- **Automated Supervision**: `ModelCheckpoint` saved optimal weights; `EarlyStopping` terminated training at Epoch 8.
-
-### 4. Production Web Application & Inference API (`app.py`, `static/`)
-- **Backend**: Asynchronous **FastAPI** service serving on port `8080`.
-- **Frontend**: Clean, minimalist SaaS aesthetic inspired by Linear and Stripe (pure HTML5, CSS3, Vanilla ES6, and Lucide outline SVGs).
-- **Interactive Capabilities**: Real-time inference (~15 ms CPU latency), dynamic ADAS confidence bar, top-3 probabilistic ranking table, and sample sign chips.
+| Parameter | Specification | Description |
+| :--- | :--- | :--- |
+| **Input Dimensions** | `48 × 48 × 3` (RGB) | Bilinear downsampling with CLAHE normalization |
+| **Architecture** | 3-Block Deep CNN | 6 Conv2D, 6 BatchNorm, 3 MaxPool2D, 4 Dropout |
+| **Trainable Weights** | `825,419` parameters | ~10 MB uncompressed / 0.81 MB quantized TFLite |
+| **Loss Function** | Sparse Categorical Cross-Entropy | Multi-class logarithmic loss optimization |
+| **Optimizer** | Adam ($\alpha = 10^{-3}$) | Momentum ($\beta_1=0.9$) + RMSProp ($\beta_2=0.999$) |
+| **Regularization** | Dropout ($0.25 - 0.50$) | Inverted Bernoulli activation masking |
+| **Inference Runtime** | ~12 - 15 ms (CPU) | Native TensorFlow / TFLite runtime |
 
 ---
 
-## 🚀 Upcoming Commercial Roadmap
+## Benchmark Performance (GTSRB)
 
-1. **Task 1: Interactive Canvas Bounding-Box Cropper (ROI Selector)**
-   - Allows users to drag-select any traffic sign inside a wide-angle dashcam / street scene to solve the Detection-vs-Classification gap directly in the browser.
-2. **Task 2: ADAS Vehicle Action & Telemetry Control Engine**
-   - Translates sign classifications into simulated automotive CAN bus vehicle actions (Speed Governing, Progressive Braking, ESC Pre-arming).
-#   t r a f f i c - s i g n - r e c o g n i t i o n  
- 
+| Metric | Training Set | Validation Set |
+| :--- | :---: | :---: |
+| **Accuracy** | **98.60%** | **99.63%** |
+| **Cross-Entropy Loss** | `0.0438` | `0.0318` |
+| **Sample Count** | 31,367 images | 7,842 images |
+| **Convergence** | 8 Epochs | EarlyStopping Triggered |
+
+---
+
+## Repository Structure
+
+```text
+traffic_sign/
+├── api/
+│   ├── index.py                  # Serverless inference entry point
+│   └── requirements.txt          # Lightweight edge dependencies
+├── models/
+│   ├── traffic_sign_cnn.keras    # Full Keras model (architecture + weights)
+│   └── traffic_sign_cnn.tflite   # Quantized edge runtime model (0.81 MB)
+├── sample_signs/                 # Reference test sign imagery
+├── src/
+│   ├── __init__.py
+│   ├── dataset.py                # Preprocessing, CLAHE, and data augmentation
+│   ├── evaluate.py               # Evaluation engine and confusion matrix generator
+│   ├── model.py                  # Deep CNN architecture blueprint
+│   ├── predict.py                # Standalone CLI inference module
+│   ├── sign_names.py             # 43 GTSRB class dictionary mapping
+│   └── train.py                  # Model training and metric visualizer
+├── static/
+│   ├── css/style.css             # Minimalist SaaS UI design system
+│   ├── js/main.js                # Frontend client controller
+│   └── index.html                # Application single-page interface
+├── app.py                        # FastAPI production web server
+├── requirements.txt              # Complete project dependencies
+├── vercel.json                   # Edge deployment configuration
+└── README.md
+```
+
+---
+
+## Quickstart
+
+### 1. Installation
+
+Clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/your-username/traffic-sign-recognition.git
+cd traffic-sign-recognition
+pip install -r requirements.txt
+```
+
+### 2. Launching the Web Service
+
+Start the local FastAPI application server:
+
+```bash
+python app.py
+```
+
+The web dashboard is available at `http://localhost:8080`.
+
+### 3. Command-Line Inference
+
+To run inference on an individual image:
+
+```bash
+python src/predict.py "sample_signs/stop_sign.png"
+```
+
+Output:
+```text
+Predicted Class ID: 14
+Predicted Sign Name: Stop
+Confidence: 100.00%
+```
+
+### 4. Running Model Training
+
+To retrain the neural network from scratch using the GTSRB dataset:
+
+```bash
+python src/train.py
+```
+
+Training metrics and loss curves will be automatically generated in `outputs/training_history.png`.
+
+---
+
+## API Reference
+
+### `POST /api/predict`
+
+Submits an image for classification.
+
+**Request:** `multipart/form-data` with key `file` (supports PNG, JPG, JPEG, WEBP, PPM).
+
+**Response:**
+```json
+{
+  "status": "success",
+  "predicted_class": 14,
+  "sign_name": "Stop",
+  "confidence": 99.82,
+  "latency_ms": 14.6,
+  "top_predictions": [
+    { "class_id": 14, "name": "Stop", "confidence": 99.82 },
+    { "class_id": 17, "name": "No entry", "confidence": 0.11 },
+    { "class_id": 13, "name": "Yield", "confidence": 0.04 }
+  ]
+}
+```
+
+---
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
