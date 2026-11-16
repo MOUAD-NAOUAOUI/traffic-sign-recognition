@@ -107,6 +107,7 @@ def preprocess_pil(image: Image.Image) -> np.ndarray:
 
 
 @app.post("/api/predict")
+@app.post("/predict")
 async def predict_sign(
     file: Optional[UploadFile] = File(None),
     sample_id: Optional[str] = None,
@@ -124,6 +125,8 @@ async def predict_sign(
             raise HTTPException(status_code=400, detail="Invalid image file format.")
     elif sample_id:
         sample_path = BASE_DIR / "sample_signs" / f"{sample_id}.png"
+        if not sample_path.exists():
+            sample_path = BASE_DIR / "public" / "samples" / f"{sample_id}.png"
         if not sample_path.exists():
             raise HTTPException(status_code=404, detail=f"Sample '{sample_id}' not found.")
         image = Image.open(sample_path)
@@ -164,8 +167,11 @@ async def predict_sign(
 
 
 @app.get("/api/samples")
+@app.get("/samples")
 def get_samples():
     samples_dir = BASE_DIR / "sample_signs"
+    if not samples_dir.exists():
+        samples_dir = BASE_DIR / "public" / "samples"
     samples = []
     if samples_dir.exists():
         for f in sorted(samples_dir.glob("*.png")):
