@@ -14,11 +14,14 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-# Attempt to load tflite_runtime (serverless), fallback to tensorflow.lite if local
+# Attempt to load ai_edge_litert (Python 3.12+), fallback to tflite_runtime, then tensorflow.lite
 try:
-    import tflite_runtime.interpreter as tflite
+    from ai_edge_litert.interpreter import Interpreter
 except ImportError:
-    import tensorflow.lite as tflite
+    try:
+        from tflite_runtime.interpreter import Interpreter
+    except ImportError:
+        from tensorflow.lite import Interpreter
 
 # Paths
 API_DIR = Path(__file__).resolve().parent
@@ -90,7 +93,7 @@ input_details = None
 output_details = None
 
 if MODEL_PATH.exists():
-    interpreter = tflite.Interpreter(model_path=str(MODEL_PATH))
+    interpreter = Interpreter(model_path=str(MODEL_PATH))
     interpreter.allocate_tensors()
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
