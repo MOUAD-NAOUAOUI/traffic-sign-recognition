@@ -1,0 +1,10 @@
+data/
+.git/
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+outputs/
+.python-version
